@@ -71,6 +71,9 @@ public:
     size_t MainNodeRank() const;
     bool IsMultiHost() const;
 
+    // Use GPUDirect RDMA support
+    int UseGpuGdr();
+
     // -----------------------------------------------------------------------
     // data-exchange functions (wrappers around MPI functions)
     // -----------------------------------------------------------------------
@@ -165,6 +168,8 @@ public:
     bool UsingAllNodes() const;
     size_t MainNodeRank() const;
     bool IsMultiHost() const;
+    // Use GPUDirect RDMA
+    int UseGpuGdr();
 
     // -----------------------------------------------------------------------
     // data-exchange functions (wrappers around MPI functions)
@@ -681,6 +686,16 @@ int MPIWrapperMpi::Error_string(int errorcode, char* str, int* resultlen)
     return MPI_Error_string(errorcode, str, resultlen);
 }
 
+int MPIWrapperMpi::UseGpuGdr()
+{
+    // Only support GPUDirect RDMA on Unix and built with GDR
+#if defined(USE_CUDA_GDR) && defined(__unix__)
+    return 1;
+#else
+    return 0;
+#endif
+}
+
 size_t MPIWrapperMpi::NumNodesInUse() const
 {
     return m_numNodesInUse;
@@ -985,6 +1000,11 @@ MPIWrapperEmpty::~MPIWrapperEmpty()
 bool MPIWrapperEmpty::IsMultiHost() const
 {
     return false;
+}
+
+int MPIWrapperEmpty::UseGpuGdr()
+{
+    return 0;
 }
 
 int MPIWrapperEmpty::Finalize(void)

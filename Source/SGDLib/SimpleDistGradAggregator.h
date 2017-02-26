@@ -146,8 +146,11 @@ private:
             m_initialized = true;
             int deviceId = gradients[0]->GetDeviceId();
 
-            if (!m_nccl.IsSupported() && (deviceId != CPUDEVICE))
+            // Initial data copy from GPU to CPU, if data on GPU and (GPUDirect RDMA not enabled or NCCL not supported)
+            if ((!m_nccl.IsSupported() || (m_mpi->UseGpuGdr() == 0)) && (deviceId != CPUDEVICE))
+            {
                 m_allocator.reset(new CUDAPageLockedMemAllocator(deviceId));
+            }
 
             size_t packedGradientsSizeInElements = 0;
             for (size_t i = 0; i < gradients.size(); i++)
@@ -194,8 +197,8 @@ private:
                 m_gradientIndexToAggregate.insert(m_gradientIndexToAggregate.begin(), 1, (size_t)-1);
             }
 
-            // If running on GPU and NCCL not supported, initialize GPU and CPU data transfer
-            if (!m_nccl.IsSupported() && (deviceId != CPUDEVICE))
+            // If running on GPU and (NCCL not supported or GPUDirect RDMA not enabled), initialize GPU and CPU data transfer
+            if ((!m_nccl.IsSupported() || (m_mpi->UseGpuGdr() == 0)) && (deviceId != CPUDEVICE))
             {
                 for (size_t i : m_gradientIndexToAggregate)
                 {
@@ -274,7 +277,7 @@ private:
         }
 
         // Initiate transfer of the bufferred data to the CPU if needed
-        if (!m_nccl.IsSupported() && deviceId != CPUDEVICE)
+        if ((!m_nccl.IsSupported() || (m_mpi->UseGpuGdr() == 0)) && deviceId != CPUDEVICE)
         {
             size_t gpuDataTransfersIdx = 0;
             Matrix<ElemType>* gpuCopyBuffer = m_aggregationBuffer.get();
@@ -321,15 +324,23 @@ private:
             {
                 allReduceRequests.push_back(MPI_Request());
                 reductionBuffer = (i == -1)? m_aggregationBuffer->Data() : gradients[i]->Data();
-                if (deviceId != CPUDEVICE)
+                if (m_mpi->UseGpuGdr() == 0 && deviceId != CPUDEVICE)
                 {
                     m_gpuDataTransferers[allReduceIndex]->WaitForCopyGPUToCPUAsync();
                     reductionBuffer = m_intermediateCPUBuffers[allReduceIndex].get();
                 }
 
-                m_mpi->Iallreduce(MPI_IN_PLACE, reductionBuffer, (i == -1) ? m_aggregationBuffer->GetNumElements() : gradients[i]->GetNumElements(),
-                    MPIWrapper::GetDataType(reductionBuffer), MPI_SUM, &allReduceRequests.back()) || MpiFail("MPI_Iallreduce");
-                allReduceIndex++;
+                if (m_mpi->UseGpuGdr() == 0)
+                {
+                    m_mpi->Iallreduce(MPI_IN_PLACE, reductionBuffer, (i == -1) ? m_aggregationBuffer->GetNumElements() : gradients[i]->GetNumElements(),
+                        MPIWrapper::GetDataType(reductionBuffer), MPI_SUM, &allReduceRequests.back()) || MpiFail("MPI_Iallreduce");
+                    allReduceIndex++;
+                }
+                // TODO: Remove this when MPI_Iallreduce with CUDA - aware is supported
+                else
+                {
+                    m_mpi->AllReduce(reductionBuffer, (i == -1) ? m_aggregationBuffer->GetNumElements() : gradients[i]->GetNumElements());
+                }
             }
         } 
         else
@@ -370,7 +381,8 @@ private:
         {
             m_nccl.Sync();
         }
-        else
+        // TODO: Remove this when MPI_Iallreduce with CUDA-aware is supported 
+        else if (m_mpi->UseGpuGdr() == 0)
         {
             // Wait for the allreduce operations to finish and initiate transfer back to the GPU if needed
             size_t gpuDataTransfersIdx = 0; // Index of allReduceRequest for each un-packed gradient
