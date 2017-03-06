@@ -67,7 +67,7 @@ def test_cifar_convnet_distributed(device_id):
                "-tensorboard_logdir", tb_logdir,
                "-q", "32",
                "-r",
-               "-device", "0" ]
+               "-device", str(device_id) ]
     mpiexec_test(device_id, script_under_test, params, 0.75, True)
 
     # Ensure that the TensorBoard log directory was created and contains exactly one file with the expected name.
