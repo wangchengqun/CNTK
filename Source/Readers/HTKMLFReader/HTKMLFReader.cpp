@@ -502,12 +502,12 @@ void HTKMLFReader<ElemType>::PrepareForTrainingOrTesting(const ConfigRecordType&
     foreach_index (i, mlfpathsmulti)
     {
         const msra::lm::CSymbolSet* wordmap = unigram ? &unigramsymbols : NULL;
-        msra::asr::htkmlfreader<msra::asr::htkmlfentry, msra::lattices::lattice::htkmlfwordsequence>
+        msra::asr::htkmlfreader<msra::asr::htkmlfentry, msra::lattices::lattice::htkmlfwordsequence, std::wstring>
         labels(mlfpathsmulti[i], restrictmlftokeys, statelistpaths[i], wordmap, (map<string, size_t>*) NULL, htktimetoframe); // label MLF
         // get the temp file name for the page file
 
         // Make sure 'msra::asr::htkmlfreader' type has a move constructor
-        static_assert(std::is_move_constructible<msra::asr::htkmlfreader<msra::asr::htkmlfentry, msra::lattices::lattice::htkmlfwordsequence>>::value,
+        static_assert(std::is_move_constructible<msra::asr::htkmlfreader<msra::asr::htkmlfentry, msra::lattices::lattice::htkmlfwordsequence, std::wstring>>::value,
                       "Type 'msra::asr::htkmlfreader' should be move constructible!");
 
         labelsmulti.push_back(std::move(labels));

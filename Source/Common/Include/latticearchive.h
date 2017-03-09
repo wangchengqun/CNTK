@@ -43,7 +43,7 @@ class CSymbolSet;
 
 namespace msra { namespace asr {
 
-template <typename A, typename B>
+template <typename A, typename B, typename C>
 class htkmlfreader;
 struct htkmlfentry;
 };
@@ -765,7 +765,7 @@ public:
     void fromhtklattice(const std::wstring& path, const std::unordered_map<std::string, size_t>& unitmap);
 
     // construct from an MLF file (numerator lattice)
-    void frommlf(const std::wstring& key, const std::unordered_map<std::string, size_t>& unitmap, const msra::asr::htkmlfreader<msra::asr::htkmlfentry, lattice::htkmlfwordsequence>& labels,
+    void frommlf(const std::wstring& key, const std::unordered_map<std::string, size_t>& unitmap, const msra::asr::htkmlfreader<msra::asr::htkmlfentry, lattice::htkmlfwordsequence, std::wstring>& labels,
                  const msra::lm::CMGramLM& lm, const msra::lm::CSymbolSet& unigramsymbols);
 
     // check consistency
@@ -1370,7 +1370,7 @@ public:
     // static method for building an archive
     static void build(const std::vector<std::wstring>& infiles, const std::wstring& outpath,
                       const std::unordered_map<std::string, size_t>& modelsymmap,
-                      const msra::asr::htkmlfreader<msra::asr::htkmlfentry, msra::lattices::lattice::htkmlfwordsequence>& labels,
+                      const msra::asr::htkmlfreader<msra::asr::htkmlfentry, msra::lattices::lattice::htkmlfwordsequence, std::wstring>& labels,
                       const msra::lm::CMGramLM& lm, const msra::lm::CSymbolSet& unigramsymbols);
 
     // static method for converting an archive to a new format

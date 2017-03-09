@@ -92,7 +92,7 @@ static size_t tryfind(const MAPTYPE &map, const KEYTYPE &key, VALTYPE deflt)
 //       UNITNAME SENONE[2] SENONE[3] SENONE[4]
 /*static*/ void archive::build(const std::vector<std::wstring> &infiles, const std::wstring &outpath,
                                const std::unordered_map<std::string, size_t> &modelsymmap,
-                               const msra::asr::htkmlfreader<msra::asr::htkmlfentry, msra::lattices::lattice::htkmlfwordsequence> &labels, // non-empty: build numer lattices
+                               const msra::asr::htkmlfreader<msra::asr::htkmlfentry, msra::lattices::lattice::htkmlfwordsequence, std::wstring> &labels, // non-empty: build numer lattices
                                const msra::lm::CMGramLM &unigram, const msra::lm::CSymbolSet &unigramsymbols)                              // for numer lattices
 {
     const bool numermode = !labels.empty(); // if labels are passed then we shall convert the MLFs to lattices, and 'infiles' are regular keys
@@ -653,7 +653,7 @@ void lattice::fromhtklattice(const wstring &path, const std::unordered_map<std::
 // construct a numerator lattice from an MLF entry
 // The lattice is expected to be freshly constructed (I did not bother to check).
 void lattice::frommlf(const wstring &key2, const std::unordered_map<std::string, size_t> &unitmap,
-                      const msra::asr::htkmlfreader<msra::asr::htkmlfentry, lattice::htkmlfwordsequence> &labels,
+                      const msra::asr::htkmlfreader<msra::asr::htkmlfentry, lattice::htkmlfwordsequence, std::wstring> &labels,
                       const msra::lm::CMGramLM &unigram, const msra::lm::CSymbolSet &unigramsymbols)
 {
     const auto &transcripts = labels.allwordtranscripts(); // (TODO: we could just pass the transcripts map--does not really matter)

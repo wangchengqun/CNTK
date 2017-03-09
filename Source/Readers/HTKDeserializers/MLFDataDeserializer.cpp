@@ -125,13 +125,13 @@ void MLFDataDeserializer::InitializeChunkDescriptions(CorpusDescriptorPtr corpus
 
     // TODO: Currently we still use the old IO module. This will be refactored later.
     const double htkTimeToFrame = 100000.0; // default is 10ms
-    msra::asr::htkmlfreader<msra::asr::htkmlfentry, msra::lattices::lattice::htkmlfwordsequence> labels(mlfPaths, set<wstring>(), stateListPath, wordTable, symbolTable, htkTimeToFrame);
+    msra::asr::htkmlfreader<msra::asr::htkmlfentry, msra::lattices::lattice::htkmlfwordsequence, std::string> labels(mlfPaths, set<wstring>(), stateListPath, wordTable, symbolTable, htkTimeToFrame);
 
     // Make sure 'msra::asr::htkmlfreader' type has a move constructor
     static_assert(
         is_move_constructible<
         msra::asr::htkmlfreader<msra::asr::htkmlfentry,
-        msra::lattices::lattice::htkmlfwordsequence >> ::value,
+        msra::lattices::lattice::htkmlfwordsequence, std::string>> ::value,
         "Type 'msra::asr::htkmlfreader' should be move constructible!");
 
     MLFUtterance description;
@@ -141,7 +141,7 @@ void MLFDataDeserializer::InitializeChunkDescriptions(CorpusDescriptorPtr corpus
     // TODO resize m_keyToSequence with number of IDs from string registry
     for (const auto& l : labels)
     {
-        auto key = msra::strfun::utf8(l.first);
+        auto key = l.first;
         if (!corpus->IsIncluded(key))
             continue;
 

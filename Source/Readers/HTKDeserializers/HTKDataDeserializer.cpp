@@ -566,7 +566,7 @@ bool HTKDataDeserializer::GetSequenceDescription(const SequenceDescription& prim
     if (m_expandToPrimary)
     {
         // Expanding for sequence length/or max seen frame.
-        size_t maxLength = max(primary.m_numberOfSamples, (uint32_t)primary.m_key.m_sample + 1);
+        uint32_t maxLength = max(primary.m_numberOfSamples, (uint32_t)primary.m_key.m_sample + 1);
         if (utterance->GetExpansionLength() < maxLength)
         {
             utterance->SetExpansionLength(maxLength);

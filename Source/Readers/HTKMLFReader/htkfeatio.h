@@ -883,8 +883,8 @@ public:
     }
 };
 
-template <class ENTRY, class WORDSEQUENCE>
-class htkmlfreader : public map<wstring, vector<ENTRY>> // [key][i] the data
+template <class ENTRY, class WORDSEQUENCE, class TKey>
+class htkmlfreader : public map<TKey, vector<ENTRY>> // [key][i] the data
 {
     wstring curpath;                                 // for error messages
     unordered_map<std::string, size_t> statelistmap; // for state <=> index
@@ -956,7 +956,7 @@ class htkmlfreader : public map<wstring, vector<ENTRY>> // [key][i] the data
         if (!restricttokeys.empty() && restricttokeys.find(key) == restricttokeys.end())
             return;
 
-        vector<ENTRY>& entries = (*this)[key]; // this creates a new entry
+        vector<ENTRY>& entries = (*this)[TKey(key.begin(), key.end())]; // this creates a new entry
         if (!entries.empty())
             malformed(msra::strfun::strprintf("duplicate entry '%ls'", key.c_str()));
         entries.resize(e - s);

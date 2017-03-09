@@ -21,7 +21,7 @@ class UtteranceDescription
     size_t m_id;
 
     // Expansion length in case if utterance should be expanded.
-    size_t m_expansionLength;
+    uint32_t m_expansionLength;
 
 public:
     UtteranceDescription(msra::asr::htkfeatreader::parsedpath&& path)
@@ -52,8 +52,8 @@ public:
     size_t GetId() const  { return m_id; }
     void SetId(size_t id) { m_id = id; }
 
-    size_t GetExpansionLength() const { return m_expansionLength; }
-    void SetExpansionLength(size_t length) { m_expansionLength = length; }
+    uint32_t GetExpansionLength() const { return m_expansionLength; }
+    void SetExpansionLength(uint32_t length) { m_expansionLength = length; }
 };
 
 }}}
