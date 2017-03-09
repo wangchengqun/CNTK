@@ -45,6 +45,7 @@ namespace msra { namespace asr {
 
 template <typename A, typename B, typename C>
 class htkmlfreader;
+
 struct htkmlfentry;
 };
 }; // for numer lattice building

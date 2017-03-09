@@ -419,8 +419,8 @@ public:
     }
 };
 
-template <class ENTRY, class WORDSEQUENCE>
-class htkmlfreader : public std::map<std::wstring, std::vector<ENTRY>> // [key][i] the data
+template <class ENTRY, class WORDSEQUENCE, class TKey>
+class htkmlfreader : public std::map<TKey, std::vector<ENTRY>> // [key][i] the data
 {
     std::wstring curpath;                                      // for error messages
     std::unordered_map<std::string, size_t> statelistmap; // for state <=> index
