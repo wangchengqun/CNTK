@@ -1086,9 +1086,10 @@ class UserFunction(Function):
          converted from and to NumPy. Defaults to True. Specifying this as
          `False` passes the data as CNTK Value objects.
         name (str): name of this function
+        op_name (str): name of operation
     '''
-    def __init__(self, inputs, as_numpy=True, name=''):
-        super(UserFunction, self).__init__(inputs, name)
+    def __init__(self, inputs, as_numpy=True, name='', op_name='UserFunction'):
+        super(UserFunction, self).__init__(op_name, inputs, name)
         self.as_numpy = as_numpy
 
         # Since the state will frequently not be used, we cache the None-state
@@ -1237,9 +1238,3 @@ class UserFunction(Function):
             A cloned instance of this user-defined function.
         '''
         raise NotImplementedError('clone has to be overwritten')
-
-    def op_name(self):
-        '''
-        Returns the operator name.
-        '''
-        return 'UserFunction'

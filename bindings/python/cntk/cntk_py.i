@@ -1,7 +1,6 @@
 %module(directors="1") cntk_py
 //%feature("autodoc", "1");
 
-
 %include "stl.i"
 %include "std_wstring.i"
 %include <std_vector.i>
@@ -613,6 +612,27 @@ public:
     #include "numpy/ndarraytypes.h"
     #include "numpy/arrayobject.h"
     using namespace CNTK;
+%}
+
+%{
+namespace CNTK
+{
+#include "cntk_py_wrap.h"
+    class SwigUserFunction : public SwigDirector_Function
+    {
+        std::wstring m_opName;
+
+    public:
+        SwigUserFunction(PyObject* self, const std::vector<Variable>& inputs, const std::wstring& name, const std::wstring& opName)
+            : SwigDirector_Function(self, inputs, name), m_opName(opName)
+        {}
+
+        const std::wstring& OpName() const
+        {
+            return m_opName;
+        }
+    };
+}
 %}
 
 //
@@ -1737,3 +1757,10 @@ for klass in [Variable, Value, NDArrayView, NDMask]:
 
 enable_reversing_tensor_shapes_in_error_messages()
 %}
+
+%extend CNTK::Function {
+    Function(const std::wstring& opName, const std::vector<Variable>& inputs, const std::wstring& name)
+    {
+        return new CNTK::SwigUserFunction(self, inputs, name, opName);
+    }
+}
