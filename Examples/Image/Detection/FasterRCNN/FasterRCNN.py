@@ -33,6 +33,7 @@ from lib.rpn.cntk_proposal_layer import ProposalLayer
 from lib.rpn.cntk_proposal_target_layer import ProposalTargetLayer
 from lib.rpn.cntk_smoothL1_loss import SmoothL1Loss
 from lib.rpn.cntk_binary_log_loss import BinaryLogLossWithIgnore
+#from lib.rpn.cntk_identity import CntkId
 
 ###############################################################
 ###############################################################
@@ -171,6 +172,9 @@ def faster_rcnn_predictor(features, gt_boxes, n_classes):
     loss_cls = cross_entropy_with_softmax(cls_score, labels, axis=1)
     loss_box = user_function(SmoothL1Loss(bbox_pred, bbox_targets))
 
+    #bbox_pred_id = user_function(CntkId(bbox_pred))
+    #loss_box = user_function(SmoothL1Loss(bbox_pred_id, bbox_targets))
+
     loss_cls_scalar = reduce_sum(loss_cls)
     loss_box_scalar = reduce_sum(loss_box)
     rpn_loss_cls_scalar = reduce_sum(rpn_loss_cls)
@@ -191,9 +195,8 @@ def train_faster_rcnn(debug_output=False):
     minibatch_source = create_mb_source(image_height, image_width, num_channels, num_rois, base_path, "train")
 
     # Input variables denoting features and labeled ground truth rois (as 5-tuples per roi)
-    # ??? TODO: why is needs_gradient = False as a default?
-    image_input = input_variable((num_channels, image_height, image_width), dynamic_axes=[Axis.default_batch_axis()], needs_gradient=True)
-    roi_input   = input_variable((num_rois, 5), dynamic_axes=[Axis.default_batch_axis()]) #, needs_gradient=True)
+    image_input = input_variable((num_channels, image_height, image_width), dynamic_axes=[Axis.default_batch_axis()])
+    roi_input   = input_variable((num_rois, 5), dynamic_axes=[Axis.default_batch_axis()])
 
     # define mapping from reader streams to network inputs
     input_map = {
@@ -218,7 +221,7 @@ def train_faster_rcnn(debug_output=False):
     trainer = Trainer(cls_score, (loss, pred_error), learner)
 
     # Get minibatches of images and perform model training
-    print("Training Fast R-CNN model for %s epochs." % max_epochs)
+    print("Training Faster R-CNN model for %s epochs." % max_epochs)
     log_number_of_parameters(cls_score)
     progress_printer = ProgressPrinter(tag='Training', num_epochs=max_epochs)
     for epoch in range(max_epochs):       # loop over epochs
@@ -265,6 +268,8 @@ def eval_faster_rcnn(model):
 if __name__ == '__main__':
     os.chdir(base_path)
     model_path = os.path.join(abs_path, "frcn_py.model")
+
+    #import pdb; pdb.set_trace()
 
     # Train only if no model exists yet
     if os.path.exists(model_path) and make_mode:

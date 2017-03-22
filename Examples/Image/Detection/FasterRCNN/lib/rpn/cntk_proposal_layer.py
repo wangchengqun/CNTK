@@ -16,6 +16,7 @@ from fast_rcnn.bbox_transform import bbox_transform_inv, clip_boxes
 from fast_rcnn.nms_wrapper import nms
 
 DEBUG = True
+debug_fwd = True
 
 # rpn_rois = user_function(ProposalLayer(rpn_cls_prob, rpn_bbox_pred, im_info))
 class ProposalLayer(UserFunction):
@@ -24,7 +25,7 @@ class ProposalLayer(UserFunction):
     transformations to a set of regular boxes (called "anchors").
     """
 
-    def __init__(self, arg1, arg2, name='ProposalLayer', im_info=None):
+    def __init__(self, arg1, arg2, name='ProposalLayer', im_info=None, rois_per_image = 100):
         super(ProposalLayer, self).__init__([arg1, arg2], name=name)
         # parse the layer parameter string, which must be valid YAML
         #layer_params = yaml.load(self.param_str_)
@@ -34,6 +35,7 @@ class ProposalLayer(UserFunction):
         self._anchors = generate_anchors(scales=np.array(anchor_scales))
         self._num_anchors = self._anchors.shape[0]
         self._im_info = im_info
+        self._rois_per_image = rois_per_image
 
         if DEBUG:
             print ('feat_stride: {}'.format(self._feat_stride))
@@ -55,6 +57,7 @@ class ProposalLayer(UserFunction):
         return [output_variable(proposalShape, self.inputs[0].dtype, self.inputs[0].dynamic_axes)]
 
     def forward(self, arguments, device=None, outputs_to_retain=None):
+        if debug_fwd: print("---> Entering forward in {}".format(self.name))
         #rpn_cls_prob, rpn_bbox_pred, im_info = arguments
         bottom = arguments
 
@@ -135,6 +138,8 @@ class ProposalLayer(UserFunction):
         # Convert anchors into proposals via bbox transformations
         proposals = bbox_transform_inv(anchors, bbox_deltas)
 
+        import pdb; pdb.set_trace()
+
         # 2. clip predicted boxes to image
         proposals = clip_boxes(proposals, im_info[:2])
 
@@ -161,12 +166,19 @@ class ProposalLayer(UserFunction):
         proposals = proposals[keep, :]
         scores = scores[keep]
 
+        # pad with zeros if too few rois were found
+        num_found_proposals = proposals.shape[0]
+        if num_found_proposals < self._rois_per_image:
+            proposals_padded = np.zeros(((self._rois_per_image,) + proposals.shape[1:]), dtype=np.float32)
+            proposals_padded[:num_found_proposals, :] = proposals
+            proposals = proposals_padded
+
+            scores_padded = np.zeros(((self._rois_per_image,) + scores.shape[1:]), dtype=np.float32)
+            scores_padded[:num_found_proposals, :] = scores
+            scores = scores_padded
+
         # Output rois blob
         # Our RPN implementation only supports a single input image, so all
-        # batch inds are 0
-        # batch_inds = np.zeros((proposals.shape[0], 1), dtype=np.float32)
-        # blob = np.hstack((batch_inds, proposals.astype(np.float32, copy=False)))
-
         # for CNTK: add batch axis to output shape
         proposals.shape = (1,) + proposals.shape
 
@@ -181,11 +193,21 @@ class ProposalLayer(UserFunction):
         # If no state needs to be passed to backward() just pass None
         return None, proposals
 
-    def backward(self, state, root_gradients):
+    def backward(self, state, root_gradients, variables):
+        """This layer does not propagate gradients."""
         # pass
-        #pass
-        #return np.asarray([])
-        return None
+        # return np.asarray([])
+
+        dummy = [k for k in variables]
+        print("Entering backward in {} for {}".format(self.name, dummy[0]))
+
+        #import pdb; pdb.set_trace()
+
+        for var in variables:
+            dummy_grads = np.zeros(var.shape, dtype=np.float32)
+            dummy_grads.shape = (1,) + dummy_grads.shape
+            print ("PL assigning gradients {} for {} {}".format(dummy_grads.shape, var, var.shape))
+            variables[var] = dummy_grads
 
 
 def _filter_boxes(boxes, min_size):

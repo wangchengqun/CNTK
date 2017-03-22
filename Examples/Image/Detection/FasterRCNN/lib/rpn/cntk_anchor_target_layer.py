@@ -285,11 +285,21 @@ class AnchorTargetLayer(UserFunction):
         # pass
     def backward(self, state, root_gradients, variables):
         """This layer does not propagate gradients."""
-        #pass
-        #return np.asarray([])
-        return None
+        # pass
+        # return np.asarray([])
 
-    #def reshape(self, bottom, top):
+        dummy = [k for k in variables]
+        print("Entering backward in {} for {}".format(self.name, dummy[0]))
+
+        #import pdb; pdb.set_trace()
+
+        for var in variables:
+            dummy_grads = np.zeros(var.shape, dtype=np.float32)
+            dummy_grads.shape = (1,) + dummy_grads.shape
+            print ("ATL assigning gradients {} for {} {}".format(dummy_grads.shape, var, var.shape))
+            variables[var] = dummy_grads
+
+                #def reshape(self, bottom, top):
     #    """Reshaping happens during the call to forward."""
     #    pass
 

@@ -166,10 +166,19 @@ class ProposalTargetLayer(UserFunction):
         # pass
     def backward(self, state, root_gradients, variables):
         """This layer does not propagate gradients."""
-        #pass
+        # pass
+        # return np.asarray([])
+
+        dummy = [k for k in variables]
+        print("Entering backward in {} for {}".format(self.name, dummy[0]))
+
         #import pdb; pdb.set_trace()
-        #return np.asarray([])
-        return None
+
+        for var in variables:
+            dummy_grads = np.zeros(var.shape, dtype=np.float32)
+            dummy_grads.shape = (1,) + dummy_grads.shape
+            print ("PTL assigning gradients {} for {} {}".format(dummy_grads.shape, var, var.shape))
+            variables[var] = dummy_grads
 
     #def reshape(self, bottom, top):
     #    """Reshaping happens during the call to forward."""
