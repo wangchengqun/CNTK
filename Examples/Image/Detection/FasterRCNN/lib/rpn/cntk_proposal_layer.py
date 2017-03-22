@@ -138,8 +138,6 @@ class ProposalLayer(UserFunction):
         # Convert anchors into proposals via bbox transformations
         proposals = bbox_transform_inv(anchors, bbox_deltas)
 
-        import pdb; pdb.set_trace()
-
         # 2. clip predicted boxes to image
         proposals = clip_boxes(proposals, im_info[:2])
 
@@ -169,6 +167,7 @@ class ProposalLayer(UserFunction):
         # pad with zeros if too few rois were found
         num_found_proposals = proposals.shape[0]
         if num_found_proposals < self._rois_per_image:
+            print("Only {} proposals generated in ProposalLayer".format(num_found_proposals))
             proposals_padded = np.zeros(((self._rois_per_image,) + proposals.shape[1:]), dtype=np.float32)
             proposals_padded[:num_found_proposals, :] = proposals
             proposals = proposals_padded
@@ -199,14 +198,13 @@ class ProposalLayer(UserFunction):
         # return np.asarray([])
 
         dummy = [k for k in variables]
-        print("Entering backward in {} for {}".format(self.name, dummy[0]))
+        #print("Entering backward in {} for {}".format(self.name, dummy[0]))
 
         #import pdb; pdb.set_trace()
 
         for var in variables:
             dummy_grads = np.zeros(var.shape, dtype=np.float32)
             dummy_grads.shape = (1,) + dummy_grads.shape
-            print ("PL assigning gradients {} for {} {}".format(dummy_grads.shape, var, var.shape))
             variables[var] = dummy_grads
 
 

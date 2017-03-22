@@ -170,14 +170,13 @@ class ProposalTargetLayer(UserFunction):
         # return np.asarray([])
 
         dummy = [k for k in variables]
-        print("Entering backward in {} for {}".format(self.name, dummy[0]))
+        #print("Entering backward in {} for {}".format(self.name, dummy[0]))
 
         #import pdb; pdb.set_trace()
 
         for var in variables:
             dummy_grads = np.zeros(var.shape, dtype=np.float32)
             dummy_grads.shape = (1,) + dummy_grads.shape
-            print ("PTL assigning gradients {} for {} {}".format(dummy_grads.shape, var, var.shape))
             variables[var] = dummy_grads
 
     #def reshape(self, bottom, top):
