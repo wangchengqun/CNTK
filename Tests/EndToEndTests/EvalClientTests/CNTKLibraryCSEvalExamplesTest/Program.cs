@@ -22,9 +22,9 @@ namespace CNTKLibraryCSEvalExamples
 
             if (ShouldRunOnCpu())
             {
-                CNTKLibraryManagedExamples.EvaluationSingleImage(DeviceDescriptor.CPUDevice);
-                CNTKLibraryManagedExamples.EvaluationBatchOfImages(DeviceDescriptor.CPUDevice);
-                CNTKLibraryManagedExamples.EvaluateMultipleImagesInParallel(DeviceDescriptor.CPUDevice);
+                //CNTKLibraryManagedExamples.EvaluationSingleImage(DeviceDescriptor.CPUDevice);
+                //CNTKLibraryManagedExamples.EvaluationBatchOfImages(DeviceDescriptor.CPUDevice);
+                //CNTKLibraryManagedExamples.EvaluateMultipleImagesInParallel(DeviceDescriptor.CPUDevice);
                 CNTKLibraryManagedExamples.EvaluationSingleSequenceUsingOneHot(DeviceDescriptor.CPUDevice);
                 CNTKLibraryManagedExamples.EvaluationBatchOfSequencesUsingOneHot(DeviceDescriptor.CPUDevice);
                 CNTKLibraryManagedExamples.EvaluationSingleSequenceUsingSparse(DeviceDescriptor.CPUDevice);
