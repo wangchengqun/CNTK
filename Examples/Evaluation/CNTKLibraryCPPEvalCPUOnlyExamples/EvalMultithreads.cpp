@@ -457,10 +457,10 @@ void RunEvaluationOneHidden(FunctionPtr evalFunc, const DeviceDescriptor& device
 void MultiThreadsEvaluation(bool isGPUAvailable)
 {
     // The number of threads running evaluation in parallel.
-    const int numOfThreads = 2;
+    const int numOfThreads = 1;
 
     fprintf(stderr, "\n##### Run evaluation on %s device with %d parallel evaluation thread(s). #####\n", isGPUAvailable ? "GPU" : "CPU", numOfThreads);
-
+#if 0
     // Test multi-threads evaluation with new function
     fprintf(stderr, "\n##### Run evaluation using new function on CPU. #####\n");
     MultiThreadsEvaluationWithNewFunction(DeviceDescriptor::CPUDevice(), numOfThreads);
@@ -478,7 +478,7 @@ void MultiThreadsEvaluation(bool isGPUAvailable)
         fprintf(stderr, "\n##### Run evaluation using clone function on GPU. #####\n");
         MultiThreadsEvaluationWithClone(DeviceDescriptor::GPUDevice(0), numOfThreads);
     }
-
+#endif
     // test multi-threads evaluation with loading existing models
     fprintf(stderr, "\n##### Run evaluation using pre-trained model on CPU. #####\n");
     MultiThreadsEvaluationWithLoadModel(DeviceDescriptor::CPUDevice(), numOfThreads);
