@@ -34,6 +34,8 @@ class BinaryLogLossWithIgnore(UserFunction):
         predictions = arguments[0][0,0,:]
         targets = arguments[1][0,0,:]
 
+        #import pdb; pdb.set_trace()
+
         targets_flat = targets.flatten()
         pred_flat = predictions.flatten()
         keep = np.where(targets_flat != self._ignore_label)

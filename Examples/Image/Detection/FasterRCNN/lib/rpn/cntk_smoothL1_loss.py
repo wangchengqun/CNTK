@@ -42,7 +42,7 @@ class SmoothL1Loss(UserFunction):
         targets = bottom[1][0,:]
         sigma = self._sigma
 
-        # import pdb; pdb.set_trace()
+        #import pdb; pdb.set_trace()
 
         diff = predictions - targets
         x = np.abs(diff)
@@ -88,7 +88,7 @@ class SmoothL1Loss(UserFunction):
             gradients.shape = (1,) + gradients.shape
             variables[self.inputs[0]] = gradients
 
-            import pdb; pdb.set_trace()
+            #import pdb; pdb.set_trace()
             #self.williscrap = [variables, state, root_gradients, gradients]
 
         if self.inputs[1] in variables:
