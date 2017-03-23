@@ -7,6 +7,7 @@
 from .. import cntk_py
 from ..tensor import ArrayMixin
 from ..utils import typemap, value_to_seq
+from cntk.internal import sanitize_dtype_cntk
 from cntk.device import use_default_device
 from cntk.utils import Record
 
@@ -105,7 +106,7 @@ class MinibatchSource(cntk_py.MinibatchSource):
           `randomization_window`, this parameter is ignored, when `randomize`
           is `False`.
         epoch_size (`int`, defaults to :const:`~cntk.io.INFINITELY_REPEAT`):
-          number of samples as a scheduling unit.A Parameters in the schedule
+          number of samples as a scheduling unit. As Parameters in the schedule
           change their values every `epoch_size` samples. If no `epoch_size` is
           provided, this parameter is substituted by the size of the full data
           sweep with infinte repeat, in which case the scheduling unit is the
@@ -119,8 +120,8 @@ class MinibatchSource(cntk_py.MinibatchSource):
         multithreaded_deserializer (`bool`, defaults to `None`): using multi
           threaded deserializer
         frame_mode (`bool`, defaults to `False`): Specifies if data should be
-          randomized and returned at the frame
-         or sequence level. When  true , input sequence are split into frames.
+          randomized and returned at the frame or sequence level. When true,
+          input sequence are split into frames.
         truncation_length (`int`): Specifies the truncation length in samples
           for BPTT (positive integer). If greater than zero `frame_mode` cannot
           be used at the same time.
@@ -140,6 +141,7 @@ class MinibatchSource(cntk_py.MinibatchSource):
         if not isinstance(deserializers, (list, tuple)):
             # allow passing a single item or a list
             deserializers = [deserializers]
+
         reader_config = _ReaderConfig(
             deserializers=deserializers,
             randomize=randomize,
@@ -173,6 +175,13 @@ class MinibatchSource(cntk_py.MinibatchSource):
         Gets the description of the stream with given name.
         Throws an exception if there are none or multiple streams with this
         same name.
+
+        Args:
+            name (str): stream name to fetch
+
+        Returns:
+            :class:`~cntk.cntk_py.StreamInformation`
+            The information for the given stream name.
         '''
         return super(MinibatchSource, self).stream_info(name)
 
@@ -341,6 +350,70 @@ def _minibatch_source(config):
     cntk_dict = _py_dict_to_cntk_dict(config)
     return cntk_py.create_composite_minibatch_source(cntk_dict)
 
+
+class StreamInformation(cntk_py.StreamInformation):
+    '''
+    Stream information container.
+
+    Args:
+        TODO
+    '''
+
+    _storage = {'dense': cntk_py.StorageFormat_Dense,
+                'sparse': cntk_py.StorageFormat_SparseCSC}
+
+    def __init__(self, stream_name, stream_id, storage_format, dtype,
+                 sample_layout):
+        super(StreamInformation, self).__init__()
+        self.m_name = stream_name
+        self.m_id = stream_id
+        self.m_storage_format = StreamInformation._storage[storage_format]
+        self.m_element_type = sanitize_dtype_cntk(dtype)
+        self.m_sample_layout = cntk_py.NDShape(sample_layout)
+
+
+class UserMinibatchSource(cntk_py.SwigMinibatchSource):
+    def __init__(self):
+        super(UserMinibatchSource, self).__init__()
+
+        streams = {si.m_name: si for si in self.stream_infos()}
+        from ..utils import Record
+        self.streams = Record(**streams)
+
+    def stream_infos(self):
+        '''
+        Function to be implemented by the user.
+
+        Returns:
+            list of :class:`StreamInformation' instances
+        '''
+        raise NotImplementedError
+
+    def _stream_infos(self, sinfos=None):
+        # sinfos is a list of stream information, which we need to fill in
+        # place, # because Swig demands it that way.
+        import ipdb;ipdb.set_trace()
+        sinfos[:] = self.stream_infos()
+
+    def stream_info(self, name):
+        '''
+        Gets the description of the stream with given name.
+        Throws an exception if there are none or multiple streams with this
+        same name.
+        '''
+        import ipdb;ipdb.set_trace()
+        return super(UserMinibatchSource, self).stream_info(name)
+
+    def __getitem__(self, name):
+        '''
+        Return the :class:`~cntk.cntk_py.StreamInformation` for the given
+        stream name.
+
+        Args:
+            name (str): stream name to fetch
+              :class:`~cntk.cntk_py.StreamInformation` for
+        '''
+        return self.stream_info(name)
 
 class _ReaderConfig(dict):
 
@@ -636,6 +709,7 @@ def StreamDef(field=None, shape=None, is_sparse=False, transforms=None,
     return Record(**config)
     # TODO: we should always use 'shape' unless it is always rank-1 or a single rank's dimension
     # TODO: dim should be inferred from the file, at least for dense
+
 
 # StreamDefs for use in constructing deserializers
 # StreamDefs(query = StreamDef(...), labels = StreamDef(...), ...)
