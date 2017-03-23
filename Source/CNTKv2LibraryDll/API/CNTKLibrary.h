@@ -1473,7 +1473,15 @@ namespace CNTK
         ConstDictionaryIterator end() const { return m_dictionaryData->end(); }
         ConstDictionaryIterator cend() const { return m_dictionaryData->cend(); }
 
-        size_t Size() { return m_dictionaryData->size();  }
+        size_t Size() const { return m_dictionaryData->size();  }
+
+        std::unordered_set<std::wstring> Keys() 
+        { 
+            std::unordered_set<std::wstring> keys;
+            for (const auto& kv : *m_dictionaryData)
+                keys.insert(kv.first);
+            return keys;
+        }
 
         friend CNTK_API std::istream& operator>>(std::istream& stream, Dictionary& us);
         friend CNTK_API std::ostream& operator<<(std::ostream& stream, const Dictionary& us);

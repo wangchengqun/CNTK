@@ -46,8 +46,58 @@ namespace CNTK
         return dict;
     }
 
+    // Copy the internal state from the network into the function graph,
+    // specifically from RngUser nodes into the attributes dictionaries of 
+    // the corresponding stateful primitive functions.
+    void CompositeFunction::UpdateInternalState() const
+    {
+        if (!m_computationNetwork)
+            return;
+
+        for (auto& function : m_allPrimitiveFunctions)
+        {
+            auto primitiveFunction = dynamic_cast<PrimitiveFunction*>(function.get());
+            if (!primitiveFunction->IsStateful())
+                continue;
+
+            // TODO: same for BatchNorm
+
+            auto& output = primitiveFunction->RawOutputs()[0];
+            const auto& rng = m_variableToNodeMap.at(output)->As<RngUser>();
+
+            auto seed = static_cast<size_t>(rng->GetRngSeed());
+            auto offset = static_cast<size_t>(rng->GetRngOffset());
+
+            primitiveFunction->m_attributes[PrimitiveFunction::AttributeNameRngSeed] = seed;
+            primitiveFunction->m_attributes[PrimitiveFunction::AttributeNameRngOffset] = offset;
+        }
+    }
+
+    // Generate a dictionary representing the internal (local) state of the function graph.
+    Dictionary CompositeFunction::GetInternalState() const
+    {
+        UpdateInternalState();
+
+        Dictionary stateDictionary;
+        for (auto& function : m_allPrimitiveFunctions)
+        {
+            auto primitiveFunction = dynamic_cast<const PrimitiveFunction*>(function.get());
+            if (!primitiveFunction->IsStateful())
+                continue;
+
+            // TODO: same for BatchNorm
+
+            // TODO: UID-based is extremely fragile, save this as a vector, based on the
+            // pre-order graph traversal instead. Also, see the comment in CopyState.
+            stateDictionary[primitiveFunction->Uid()] = primitiveFunction->Attributes();
+        }
+        return stateDictionary;
+    }
+
     /*virtual*/ Dictionary CompositeFunction::Serialize() const
     {
+        UpdateInternalState();
+
         Dictionary dict = SerializeBlockComposite();
        
         // Find cycles in the graph and "break" them by inserting placeholders.
@@ -129,29 +179,6 @@ namespace CNTK
         }
 
         dict[functionsKey] = std::move(functionDictionaries);
-        
-        // Now, collect and store the internal state for all non-pure (stateful) functions in the graph 
-        // (with the corresponding nodes that subclass from RngUser: Dropout, RandomSample, etc).
-        Dictionary stateDictionary; 
-        for (const auto& kv : m_variableToNodeMap)
-        {
-            if (kv.second->Is<RngUser>() && kv.first.IsOutput())
-            {
-                // The RNG state should be associated with the actual function that the computation node
-                // corresponds to, and not the block primitives that wrap the actual function
-                auto ownerFunction = kv.first.Owner().get();
-                if (!ownerFunction->IsBlock())
-                {
-                    auto rng = kv.second->As<RngUser>();
-                    Dictionary state;
-                    state[rngSeedKey] = static_cast<size_t>(rng->GetRngSeed());
-                    state[rngOffsetKey] = static_cast<size_t>(rng->GetRngOffset());
-                    stateDictionary[ownerFunction->Uid()] = state;
-                }
-            }
-        }
-
-        dict[stateKey] = std::move(stateDictionary);
 
         return dict;
     }
@@ -217,10 +244,6 @@ namespace CNTK
             uidToInputMap[inputVar.Uid()] = inputVar;
         }
 
-        Dictionary stateDictionary;
-        if (dict.Contains(stateKey))
-            stateDictionary = dict[stateKey].Value<Dictionary>();
-
         const auto& functions = dict[functionsKey].Value<vector<DictionaryValue>>();
 
         std::unordered_map<Variable, Variable> allPlaceholderReplacements;
@@ -237,25 +260,6 @@ namespace CNTK
             auto opType = primitiveFunction->OpType();
             if (opType == PrimitiveOpType::Combine)
                 continue;
-
-            if (primitiveFunction->IsStateful())
-            {
-                if (stateDictionary.Contains(primitiveFunction->Uid()))
-                {
-                    auto state = stateDictionary[primitiveFunction->Uid()].Value<Dictionary>();
-                    auto seed = state[rngSeedKey].Value<size_t>();
-                    auto offset = state[rngOffsetKey].Value<size_t>();
-                    primitiveFunction->m_attributes[PrimitiveFunction::AttributeNameRngSeed] = seed;
-                    primitiveFunction->m_attributes[PrimitiveFunction::AttributeNameRngOffset] = offset;
-                }  
-                else if (Internal::GetComputationNetworkTraceLevel() > 0)
-                {
-                    // TODO: all logging functionality should be refactored to live in a logging utility class. 
-                    fprintf(stderr, "WARNING: no state information found for the stateful function (%ls) "
-                            "when deserializing from a dictionary (version=%zu). "
-                            "Reproducibility not guaranteed.", primitiveFunction->OpName().c_str(), version);
-                }
-            }
 
             for (const auto& output : root->RawOutputs())
             {
@@ -276,61 +280,88 @@ namespace CNTK
             }
         }
 
+        if (version < 3)
+            RestoreStatefulFunctions(version, dict, allPrimitiveFunctions);
+
         return DeserializeBlockComposite(dict, allPrimitiveFunctions, allPlaceholderReplacements, device);
+    }
+
+    void CompositeFunction::RestoreStatefulFunctions(size_t version, const Dictionary& dict, std::unordered_set<FunctionPtr> functions) 
+    {
+        Dictionary stateDictionary;
+        if (dict.Contains(stateKey))
+            stateDictionary = dict[stateKey].Value<Dictionary>();
+
+        for (auto& function : functions)
+        {
+            auto primitiveFunction = dynamic_cast<PrimitiveFunction*>(function.get());
+            if (!primitiveFunction->IsStateful())
+                continue;
+
+            if (stateDictionary.Contains(primitiveFunction->Uid()))
+            {
+                auto state = stateDictionary[primitiveFunction->Uid()].Value<Dictionary>();
+                auto seed = state[rngSeedKey].Value<size_t>();
+                auto offset = state[rngOffsetKey].Value<size_t>();
+                primitiveFunction->m_attributes[PrimitiveFunction::AttributeNameRngSeed] = seed;
+                primitiveFunction->m_attributes[PrimitiveFunction::AttributeNameRngOffset] = offset;
+            }
+            else if (Internal::GetComputationNetworkTraceLevel() > 0)
+            {
+                // TODO: all logging functionality should be refactored to live in a logging utility class. 
+                fprintf(stderr, "WARNING: no state information found for the stateful function (%ls) "
+                    "when deserializing from a dictionary (version=%zu). "
+                    "Reproducibility not guaranteed.", primitiveFunction->OpName().c_str(), version);
+            }
+        }
     }
 
     void CompositeFunction::CopyState(const CompositeFunction& source)
     {
-        // Create a map with all non-pure (stateful) functions in the function graph.
-        auto collectStatefulFunctions = [](const std::unordered_set<FunctionPtr>& allPrimitiveFunctions) -> std::map<std::wstring, FunctionPtr> {
-            std::map<std::wstring, FunctionPtr> functionMap;
-            for (auto funcPtr : allPrimitiveFunctions)
-            {
-                auto primitiveFunction = dynamic_cast<const PrimitiveFunction*>(funcPtr.get());
-                if (primitiveFunction->IsStateful())
-                {
-                    functionMap[primitiveFunction->Uid()] = funcPtr;
-                }
-            }
-            return functionMap;
-        };
+        auto state = source.GetInternalState();
+        auto ourState = GetInternalState();
 
-        std::map<std::wstring, FunctionPtr> statefulFunctionsTo = collectStatefulFunctions(m_allPrimitiveFunctions);
-        std::map<std::wstring, FunctionPtr> statefulFunctionsFrom = collectStatefulFunctions(source.m_allPrimitiveFunctions);
+        // Since the internal state is a dictionary, mapping from function uids to 
+        // the respective state, we rely on the assumption here that the uids in 
+        // the source and the destination are identical. However, this may not
+        // always hold in practice (the state of the UID generator my be different
+        // when creating the original function and when restoring from a checkpoint).
+        // TODO: to mitigate the potential difference in uids, remap the function state
+        // based on the pre-order traversal of the graphs.
+        if (ourState.Keys() != state.Keys())
+            CNTK::LogicError("Cannot copy internal state, the source and the destination contain different function UIDs.");
 
-        assert(statefulFunctionsTo.size() == statefulFunctionsFrom.size());
-        if (statefulFunctionsFrom.size() == 0)
-        {
-            return;
-        }
-
-        // Copy state captured in the attributes dictionaries.
-        for (const auto& kv : statefulFunctionsFrom)
-        {
-            statefulFunctionsTo[kv.first]->m_attributes = kv.second->Attributes();
-        }
-
-        UpdateInternalNetworkState();
+        SetInternalState(state);
     }
 
-    void CompositeFunction::UpdateInternalNetworkState()
+    void CompositeFunction::SetInternalState(const Dictionary& state)
     {
-        if (!m_computationNetwork)
-        {
+        if (state.Size() == 0)
             return;
-        }
 
         for (const auto& function : m_allPrimitiveFunctions)
         {
-            auto primitiveFunction = dynamic_cast<const PrimitiveFunction*>(function.get());
-            if (primitiveFunction->IsStateful())
+            auto primitiveFunction = dynamic_cast<PrimitiveFunction*>(function.get());
+            if (!primitiveFunction->IsStateful())
+                continue;
+
+            auto functionState = state[primitiveFunction->Uid()].Value<Dictionary>();
+            auto seed = functionState[PrimitiveFunction::AttributeNameRngSeed].Value<size_t>();
+            auto offset = functionState[PrimitiveFunction::AttributeNameRngOffset].Value<size_t>();
+
+            if (!m_computationNetwork)
             {
+                // the network is not yet compiled, copy the attributes from the state
+                // in the primitive function. 
+                primitiveFunction->m_attributes[PrimitiveFunction::AttributeNameRngSeed] = seed;
+                primitiveFunction->m_attributes[PrimitiveFunction::AttributeNameRngOffset] = offset;
+            }
+            else 
+            {
+                // copy the state directly into the network
                 for (const auto& output : function->RawOutputs())
                 {
                     auto node = m_variableToNodeMap.at(output);
-                    auto attributes = function->Attributes();
-                    auto seed = attributes[PrimitiveFunction::AttributeNameRngSeed].Value<size_t>();
-                    auto offset = attributes[PrimitiveFunction::AttributeNameRngOffset].Value<size_t>();
                     node->As<RngUser>()->SetRngState(seed, offset);
                 }
             }

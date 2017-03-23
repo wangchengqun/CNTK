@@ -8,6 +8,8 @@
 #include "Utils.h"
 #include "Learner.h"
 #include "PerformanceProfiler.h"
+#include "CompositeFunction.h"
+#include "Serialization.h"
 
 namespace
 {
@@ -391,15 +393,22 @@ namespace CNTK
     void Trainer::SaveCheckpoint(const std::wstring& modelFilePath, Dictionary externalState)
     {
         auto learnersState = m_parameterLearners->CreateCheckpoint();
+
         if (!m_distributed)
             return Save(modelFilePath, learnersState, externalState);
+
+        auto compositeFunction = dynamic_cast<CompositeFunction*>(m_combinedTrainingFunction.get());
+
+        Dictionary state;
+        state[internalWorkerStateKey] = compositeFunction->GetInternalState(); // this is the local worker's state.
+        state[externalStateKey] = externalState;
 
         // Collect distrbuted external state.
         DistributedCommunicatorPtr communicator = MPICommunicator();
         communicator->Barrier();
 
         std::vector<DictionaryPtr> remoteState;
-        communicator->Gather(externalState, remoteState, communicator->Workers());
+        communicator->Gather(state, remoteState, communicator->Workers());
 
         Dictionary aggregatedState;
         for (const auto& w : communicator->Workers())
@@ -444,24 +453,52 @@ namespace CNTK
         Dictionary checkpoint = Dictionary::Load(GetTrainerStateCheckpointFilePath(modelFilePath));
 
         auto learnerState = checkpoint[learnersPropertyName].Value<std::vector<DictionaryValue>>();
-        auto externalState = checkpoint[externalStatePropertyName].Value<Dictionary>();
+        auto state = checkpoint[externalStatePropertyName].Value<Dictionary>();
+
+        m_parameterLearners->RestoreFromCheckpoint(learnerState);
+
+        auto zero = std::to_wstring(0);
 
         if (!m_distributed)
         {
-            m_parameterLearners->RestoreFromCheckpoint(learnerState);
-            return externalState;
+            // check if it was saved in distributed mode.
+            if (state.Contains(zero)) 
+            {
+                state = state[zero].Value<Dictionary>();
+                if (state.Contains(externalStateKey))
+                    state = state[externalStateKey].Value<Dictionary>();
+            }
+            return state;
         }
 
-        m_parameterLearners->RestoreFromCheckpoint(learnerState);
+        // this ensures that nobody will start writing to the model/checkpoint files, until
+        // everybody is done reading them.
         DistributedCommunicatorPtr communicator = MPICommunicator();
         communicator->Barrier();
 
         auto key = std::to_wstring(communicator->CurrentWorker().m_globalRank);
+        
+        if (state.Contains(key)) 
+        {
+            state = state[key].Value<Dictionary>();
 
-        if (externalState.Contains(key))
-            return externalState[key].Value<Dictionary>();
-        else
-            return externalState[std::to_wstring(0)].Value<Dictionary>();
+            if (state.Contains(internalWorkerStateKey)) 
+            {
+                // the checkpoint contains internal state for this worker.
+                auto internalState = state[internalWorkerStateKey].Value<Dictionary>();
+                auto compositeFunction = dynamic_cast<CompositeFunction*>(m_combinedTrainingFunction.get());
+                compositeFunction->SetInternalState(internalState);
+            }
+        }
+        else if (state.Contains(zero)) 
+            state = state[zero].Value<Dictionary>();
+        
+        // else: state was saved in a non-distributed mode.
+
+        if (state.Contains(externalStateKey))
+            state = state[externalStateKey].Value<Dictionary>();
+
+        return state;
     }
 
     double Trainer::PreviousMinibatchLossAverage() const
