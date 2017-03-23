@@ -2128,6 +2128,10 @@ namespace CNTK
         friend class Utils;
 
     public:
+
+        ///
+        /// a special index for one hot to indicate zero vector
+        ///
         static const size_t OneHotSkip = (size_t)-1;
 
         ///
