@@ -238,6 +238,8 @@ class AnchorTargetLayer(UserFunction):
             print ('rpn: num_positive avg', self._fg_sum / self._count)
             print ('rpn: num_negative avg', self._bg_sum / self._count)
 
+        #import pdb; pdb.set_trace()
+
         # labels
         labels = labels.reshape((1, height, width, A)).transpose(0, 3, 1, 2)
         #labels = labels.reshape((1, 1, A * height, width))

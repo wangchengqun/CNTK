@@ -127,21 +127,22 @@ def faster_rcnn_predictor(features, gt_boxes, n_classes):
     rpn_cls_score = Convolution((1,1), 18, activation=None) (rpn_conv_3x3) # 2(bg/fg) * 9(anchors)
     rpn_bbox_pred = Convolution((1,1), 36, activation=None) (rpn_conv_3x3) # 4 * 9(anchors) # ??? activation=relu ???
 
+    # RPN losses
+    # Comment: rpn_cls_prob is only passed   vvv   to get width and height of the conv feature map ...
+    atl = user_function(AnchorTargetLayer(rpn_cls_score, gt_boxes, im_info=im_info))
+    rpn_labels = atl.outputs[0]
+    rpn_bbox_targets = atl.outputs[1]
+
+    # rpn_loss_cls = user_function(BinaryLogLossWithIgnore(rpn_cls_prob, rpn_labels, ignore_label=-1))
+    ignore = user_function(IgnoreLabel(rpn_cls_score, rpn_labels, ignore_label=-1))
+    rpn_loss_cls = cross_entropy_with_softmax(ignore.outputs[0], ignore.outputs[1])
+    rpn_loss_bbox = user_function(SmoothL1Loss(rpn_bbox_pred, rpn_bbox_targets))
+
+    # compute softmax probabilities from rpn as input to the ProposalLayer
     # reshape predictions per (H, W) position from 18 (9*bg and 9*fg) to (2,9) ( == (bg, fg) per anchor)
     shp = (2,) + (int(rpn_cls_score.shape[0] / 2),) + rpn_cls_score.shape[-2:]
     rpn_cls_score_reshape = reshape(rpn_cls_score, shp)
     rpn_cls_prob = softmax(rpn_cls_score_reshape, axis=0)
-
-    # RPN losses
-    # Comment: rpn_cls_prob is only passed to get width and height of the conv feature map ...
-    atl = user_function(AnchorTargetLayer(rpn_cls_prob, gt_boxes, im_info=im_info))
-    rpn_labels = atl.outputs[0]
-    rpn_bbox_targets = atl.outputs[1]
-
-    rpn_loss_cls = user_function(BinaryLogLossWithIgnore(rpn_cls_prob, rpn_labels, ignore_label=-1))
-    #ignore = user_function(IgnoreLabel(rpn_cls_prob, rpn_labels, ignore_label=-1))
-    #rpn_loss_cls = user_function(BinaryLogLossWithIgnore(ignore.outputs[0], ignore.outputs[1], ignore_label=-1))
-    rpn_loss_bbox = user_function(SmoothL1Loss(rpn_bbox_pred, rpn_bbox_targets))
 
     # ROI proposal
     # - ProposalLayer:
