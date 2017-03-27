@@ -17,7 +17,7 @@ from fast_rcnn.config import cfg
 from fast_rcnn.bbox_transform import bbox_transform
 from utils.cython_bbox import bbox_overlaps
 
-DEBUG = True
+DEBUG = False
 
 class AnchorTargetLayer(UserFunction):
     """
@@ -73,8 +73,8 @@ class AnchorTargetLayer(UserFunction):
         # bbox_outside_weights
         ##top[3].reshape(1, A * 4, height, width)
 
-        return [output_variable(labelShape, self.inputs[0].dtype, self.inputs[0].dynamic_axes),
-                output_variable(bbox_target_shape, self.inputs[0].dtype, self.inputs[0].dynamic_axes)]
+        return [output_variable(labelShape, self.inputs[0].dtype, self.inputs[0].dynamic_axes, needs_gradient=False),
+                output_variable(bbox_target_shape, self.inputs[0].dtype, self.inputs[0].dynamic_axes, needs_gradient=False)]
 
     #def forward(self, bottom, top):
     def forward(self, arguments, outputs, device=None, outputs_to_retain=None):
@@ -285,18 +285,10 @@ class AnchorTargetLayer(UserFunction):
     # def backward(self, top, propagate_down, bottom):
         # """This layer does not propagate gradients."""
         # pass
+
     def backward(self, state, root_gradients, variables):
         """This layer does not propagate gradients."""
-        # pass
-        #dummy = [k for k in variables]
-        #print("Entering backward in {} for {}".format(self.name, dummy[0]))
-
-        #import pdb; pdb.set_trace()
-
-        for var in variables:
-            dummy_grads = np.zeros(var.shape, dtype=np.float32)
-            dummy_grads.shape = (1,) + dummy_grads.shape
-            variables[var] = dummy_grads
+        pass
 
 
 def _unmap(data, count, inds, fill=0):

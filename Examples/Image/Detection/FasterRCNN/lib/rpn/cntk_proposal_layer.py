@@ -15,8 +15,7 @@ from generate_anchors import generate_anchors
 from fast_rcnn.bbox_transform import bbox_transform_inv, clip_boxes
 from fast_rcnn.nms_wrapper import nms
 
-DEBUG = True
-debug_fwd = True
+DEBUG = False
 
 # rpn_rois = user_function(ProposalLayer(rpn_cls_prob, rpn_bbox_pred, im_info))
 class ProposalLayer(UserFunction):
@@ -54,10 +53,10 @@ class ProposalLayer(UserFunction):
         #if len(top) > 1:
         #    top[1].reshape(1, 1, 1, 1)
 
-        return [output_variable(proposalShape, self.inputs[0].dtype, self.inputs[0].dynamic_axes)]
+        return [output_variable(proposalShape, self.inputs[0].dtype, self.inputs[0].dynamic_axes, needs_gradient=False)]
 
     def forward(self, arguments, device=None, outputs_to_retain=None):
-        if debug_fwd: print("---> Entering forward in {}".format(self.name))
+        if DEBUG: print("---> Entering forward in {}".format(self.name))
         #rpn_cls_prob, rpn_bbox_pred, im_info = arguments
         bottom = arguments
 
@@ -194,18 +193,7 @@ class ProposalLayer(UserFunction):
 
     def backward(self, state, root_gradients, variables):
         """This layer does not propagate gradients."""
-        # pass
-        # return np.asarray([])
-
-        dummy = [k for k in variables]
-        #print("Entering backward in {} for {}".format(self.name, dummy[0]))
-
-        #import pdb; pdb.set_trace()
-
-        for var in variables:
-            dummy_grads = np.zeros(var.shape, dtype=np.float32)
-            dummy_grads.shape = (1,) + dummy_grads.shape
-            variables[var] = dummy_grads
+        pass
 
 
 def _filter_boxes(boxes, min_size):

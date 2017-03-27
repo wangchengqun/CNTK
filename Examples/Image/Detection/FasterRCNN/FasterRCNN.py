@@ -16,7 +16,6 @@ sys.path.append(os.path.join(abs_path, "lib", "rpn"))
 sys.path.append(os.path.join(abs_path, "lib", "nms"))
 sys.path.append(os.path.join(abs_path, "lib", "nms", "gpu"))
 
-#import cntk
 from cntk import Trainer, UnitType, load_model, reshape, user_function, Axis
 from cntk.io import MinibatchSource, ImageDeserializer, CTFDeserializer, StreamDefs, StreamDef
 from cntk.io.transforms import *
@@ -34,8 +33,6 @@ from lib.rpn.cntk_proposal_layer import ProposalLayer
 from lib.rpn.cntk_proposal_target_layer import ProposalTargetLayer
 from lib.rpn.cntk_smoothL1_loss import SmoothL1Loss
 from lib.rpn.cntk_ignore_label import IgnoreLabel
-#from lib.rpn.cntk_binary_log_loss import BinaryLogLossWithIgnore
-#from lib.rpn.cntk_identity import CntkId
 
 ###############################################################
 ###############################################################
@@ -124,15 +121,16 @@ def faster_rcnn_predictor(features, gt_boxes, n_classes):
 
     # RPN network
     rpn_conv_3x3  = Convolution((3,3), 256, activation=relu, pad=True, strides=1)(conv_out)
-    rpn_cls_score = Convolution((1,1), 18, activation=None) (rpn_conv_3x3) # 2(bg/fg) * 9(anchors)
-    rpn_bbox_pred = Convolution((1,1), 36, activation=None) (rpn_conv_3x3) # 4 * 9(anchors) # ??? activation=relu ???
+    rpn_cls_score = Convolution((1,1), 18, activation=None) (rpn_conv_3x3) # 2(bg/fg)  * 9(anchors)
+    rpn_bbox_pred = Convolution((1,1), 36, activation=None) (rpn_conv_3x3) # 4(coords) * 9(anchors)
 
-    # RPN losses
-    # Comment: rpn_cls_prob is only passed   vvv   to get width and height of the conv feature map ...
+    # RPN targets
+    # Comment: rpn_cls_score is only passed   vvv   to get width and height of the conv feature map ...
     atl = user_function(AnchorTargetLayer(rpn_cls_score, gt_boxes, im_info=im_info))
     rpn_labels = atl.outputs[0]
     rpn_bbox_targets = atl.outputs[1]
 
+    # RPN losses
     #rpn_loss_cls = user_function(BinaryLogLossWithIgnore(rpn_cls_prob, rpn_labels, ignore_label=-1))
     #rpn_loss_cls = user_function(cross_entropy_with_softmax(rpn_cls_score, rpn_labels))
     ignore = user_function(IgnoreLabel(rpn_cls_score, rpn_labels, ignore_label=-1))
@@ -177,9 +175,6 @@ def faster_rcnn_predictor(features, gt_boxes, n_classes):
     # loss function
     loss_cls = cross_entropy_with_softmax(cls_score, labels, axis=1)
     loss_box = user_function(SmoothL1Loss(bbox_pred, bbox_targets))
-
-    #bbox_pred_id = user_function(CntkId(bbox_pred))
-    #loss_box = user_function(SmoothL1Loss(bbox_pred_id, bbox_targets))
 
     loss_cls_scalar = reduce_sum(loss_cls)
     loss_box_scalar = reduce_sum(loss_box)
