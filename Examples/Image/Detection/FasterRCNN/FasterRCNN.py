@@ -7,6 +7,7 @@
 from __future__ import print_function
 import numpy as np
 import os, sys
+
 abs_path = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(abs_path)
 sys.path.append(os.path.join(abs_path, "..", ".."))
@@ -16,25 +17,24 @@ sys.path.append(os.path.join(abs_path, "lib", "nms"))
 sys.path.append(os.path.join(abs_path, "lib", "nms", "gpu"))
 
 #import cntk
-from cntk import Trainer, UnitType, load_model, reshape
-from cntk.layers import Placeholder, Constant, Convolution
-from cntk.graph import find_by_name, plot
-from cntk.initializer import glorot_uniform
+from cntk import Trainer, UnitType, load_model, reshape, user_function, Axis
 from cntk.io import MinibatchSource, ImageDeserializer, CTFDeserializer, StreamDefs, StreamDef
 from cntk.io.transforms import *
-from cntk.learner import momentum_sgd, learning_rate_schedule, momentum_as_time_constant_schedule
-from cntk.ops import input_variable, parameter, cross_entropy_with_softmax, classification_error, times, combine, relu, softmax
-from cntk.ops import roipooling, reduce_sum
+from cntk.initializer import glorot_uniform
+from cntk.layers import Placeholder, Constant, Convolution
+from cntk.learners import momentum_sgd, learning_rate_schedule, momentum_as_time_constant_schedule
+from cntk.logging import log_number_of_parameters, ProgressPrinter
+from cntk.logging.graph import find_by_name, plot
+from cntk.losses import cross_entropy_with_softmax
+from cntk.metrics import classification_error
+from cntk.ops import input_variable, parameter, times, combine, relu, softmax, roipooling, reduce_sum
 from cntk.ops.functions import CloneMethod
-from cntk.utils import log_number_of_parameters, ProgressPrinter
-from cntk import user_function, Axis
-from cntk.losses import binary_cross_entropy
 from lib.rpn.cntk_anchor_target_layer import AnchorTargetLayer
 from lib.rpn.cntk_proposal_layer import ProposalLayer
 from lib.rpn.cntk_proposal_target_layer import ProposalTargetLayer
 from lib.rpn.cntk_smoothL1_loss import SmoothL1Loss
 from lib.rpn.cntk_ignore_label import IgnoreLabel
-from lib.rpn.cntk_binary_log_loss import BinaryLogLossWithIgnore
+#from lib.rpn.cntk_binary_log_loss import BinaryLogLossWithIgnore
 #from lib.rpn.cntk_identity import CntkId
 
 ###############################################################
@@ -133,7 +133,8 @@ def faster_rcnn_predictor(features, gt_boxes, n_classes):
     rpn_labels = atl.outputs[0]
     rpn_bbox_targets = atl.outputs[1]
 
-    # rpn_loss_cls = user_function(BinaryLogLossWithIgnore(rpn_cls_prob, rpn_labels, ignore_label=-1))
+    #rpn_loss_cls = user_function(BinaryLogLossWithIgnore(rpn_cls_prob, rpn_labels, ignore_label=-1))
+    #rpn_loss_cls = user_function(cross_entropy_with_softmax(rpn_cls_score, rpn_labels))
     ignore = user_function(IgnoreLabel(rpn_cls_score, rpn_labels, ignore_label=-1))
     rpn_loss_cls = cross_entropy_with_softmax(ignore.outputs[0], ignore.outputs[1])
     rpn_loss_bbox = user_function(SmoothL1Loss(rpn_bbox_pred, rpn_bbox_targets))
