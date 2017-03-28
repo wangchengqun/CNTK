@@ -8,6 +8,8 @@ import numpy as np
 from fast_rcnn.config import cfg
 
 DEBUG = True
+debug_fwd = False
+debug_bkw = False
 
 class SmoothL1Loss(UserFunction):
     """
@@ -22,6 +24,7 @@ class SmoothL1Loss(UserFunction):
         return [output_variable(self.inputs[0].shape, self.inputs[0].dtype, self.inputs[0].dynamic_axes)]
 
     def forward(self, arguments, device=None, outputs_to_retain=None):
+        if debug_fwd: print("--> Entering forward in {}".format(self.name))
         # Algorithm:
         #
         # (According to Fast R-CNN paper, formula (3))
@@ -45,14 +48,12 @@ class SmoothL1Loss(UserFunction):
         return diff, loss
 
     def backward(self, state, root_gradients, variables):
+        if debug_bkw: print("<-- Entering backward in {}".format(self.name))
         # Derivative of smooth L1 loss:
         #
         # - root_gradients      , if diff <= -1
         # diff * root_gradients , if -1 < diff < 1
         # root_gradients        , else
-
-        dummy = [k for k in variables]
-        print("Entering backward in {} for {}".format(self.name, dummy[0]))
 
         # A gradient is only required for predictions, not for targets
         if self.inputs[0] in variables:

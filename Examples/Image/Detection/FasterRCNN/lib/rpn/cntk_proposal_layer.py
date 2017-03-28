@@ -16,6 +16,8 @@ from fast_rcnn.bbox_transform import bbox_transform_inv, clip_boxes
 from fast_rcnn.nms_wrapper import nms
 
 DEBUG = False
+debug_fwd = False
+debug_bkw = False
 
 # rpn_rois = user_function(ProposalLayer(rpn_cls_prob, rpn_bbox_pred, im_info))
 class ProposalLayer(UserFunction):
@@ -56,7 +58,7 @@ class ProposalLayer(UserFunction):
         return [output_variable(proposalShape, self.inputs[0].dtype, self.inputs[0].dynamic_axes, needs_gradient=False)]
 
     def forward(self, arguments, device=None, outputs_to_retain=None):
-        if DEBUG: print("---> Entering forward in {}".format(self.name))
+        if debug_fwd: print("--> Entering forward in {}".format(self.name))
         #rpn_cls_prob, rpn_bbox_pred, im_info = arguments
         bottom = arguments
 
@@ -192,6 +194,7 @@ class ProposalLayer(UserFunction):
         return None, proposals
 
     def backward(self, state, root_gradients, variables):
+        if debug_bkw: print("<-- Entering backward in {}".format(self.name))
         """This layer does not propagate gradients."""
         pass
 

@@ -18,6 +18,8 @@ from fast_rcnn.bbox_transform import bbox_transform
 from utils.cython_bbox import bbox_overlaps
 
 DEBUG = False
+debug_fwd = False
+debug_bkw = False
 
 class AnchorTargetLayer(UserFunction):
     """
@@ -78,6 +80,7 @@ class AnchorTargetLayer(UserFunction):
 
     #def forward(self, bottom, top):
     def forward(self, arguments, outputs, device=None, outputs_to_retain=None):
+        if debug_fwd: print("--> Entering forward in {}".format(self.name))
         # Algorithm:
         #
         # for each (H, W) location i
@@ -287,6 +290,7 @@ class AnchorTargetLayer(UserFunction):
         # pass
 
     def backward(self, state, root_gradients, variables):
+        if debug_bkw: print("<-- Entering backward in {}".format(self.name))
         """This layer does not propagate gradients."""
         pass
 

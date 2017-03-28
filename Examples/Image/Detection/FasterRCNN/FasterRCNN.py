@@ -16,7 +16,7 @@ sys.path.append(os.path.join(abs_path, "lib", "rpn"))
 sys.path.append(os.path.join(abs_path, "lib", "nms"))
 sys.path.append(os.path.join(abs_path, "lib", "nms", "gpu"))
 
-from cntk import Trainer, UnitType, load_model, reshape, user_function, Axis
+from cntk import Trainer, UnitType, load_model, user_function, Axis
 from cntk.io import MinibatchSource, ImageDeserializer, CTFDeserializer, StreamDefs, StreamDef
 from cntk.io.transforms import *
 from cntk.initializer import glorot_uniform
@@ -26,7 +26,7 @@ from cntk.logging import log_number_of_parameters, ProgressPrinter
 from cntk.logging.graph import find_by_name, plot
 from cntk.losses import cross_entropy_with_softmax
 from cntk.metrics import classification_error
-from cntk.ops import input_variable, parameter, times, combine, relu, softmax, roipooling, reduce_sum
+from cntk.ops import input_variable, parameter, times, combine, relu, softmax, roipooling, reduce_sum, slice, splice, reshape
 from cntk.ops.functions import CloneMethod
 from lib.rpn.cntk_anchor_target_layer import AnchorTargetLayer
 from lib.rpn.cntk_proposal_layer import ProposalLayer
@@ -54,7 +54,7 @@ num_rois = 100
 epoch_size = 25
 num_test_images = 5
 mb_size = 1
-max_epochs = 10
+max_epochs = 3
 momentum_time_constant = 10
 
 # model specific variables (only AlexNet for now)
@@ -130,18 +130,30 @@ def faster_rcnn_predictor(features, gt_boxes, n_classes):
     rpn_labels = atl.outputs[0]
     rpn_bbox_targets = atl.outputs[1]
 
-    # RPN losses
-    #rpn_loss_cls = user_function(BinaryLogLossWithIgnore(rpn_cls_prob, rpn_labels, ignore_label=-1))
-    #rpn_loss_cls = user_function(cross_entropy_with_softmax(rpn_cls_score, rpn_labels))
-    ignore = user_function(IgnoreLabel(rpn_cls_score, rpn_labels, ignore_label=-1))
-    rpn_loss_cls = cross_entropy_with_softmax(ignore.outputs[0], ignore.outputs[1])
-    rpn_loss_bbox = user_function(SmoothL1Loss(rpn_bbox_pred, rpn_bbox_targets))
+    # getting rpn class scores and rpn targets into the correct shape for ce
+    # i.e., (2, 33k), where each group of two corresponds to a (bg, fg) pair for score or target
+    # Reshape scores
+    num_anchors = int(rpn_cls_score.shape[0] / 2)
+    num_predictions = int(np.prod(rpn_cls_score.shape) / 2)
+    bg_scores = slice(rpn_cls_score, 0, 0, num_anchors)
+    fg_scores = slice(rpn_cls_score, 0, num_anchors, num_anchors * 2)
+    bg_scores_rshp = reshape(bg_scores, (1,num_predictions))
+    fg_scores_rshp = reshape(fg_scores, (1,num_predictions))
+    rpn_cls_score_rshp = splice(bg_scores_rshp, fg_scores_rshp, axis=0)
+    rpn_cls_prob = softmax(rpn_cls_score_rshp, axis=0)
+    # Reshape targets
+    rpn_labels_rshp = reshape(rpn_labels, (1,num_predictions))
 
-    # compute softmax probabilities from rpn as input to the ProposalLayer
-    # reshape predictions per (H, W) position from 18 (9*bg and 9*fg) to (2,9) ( == (bg, fg) per anchor)
-    shp = (2,) + (int(rpn_cls_score.shape[0] / 2),) + rpn_cls_score.shape[-2:]
-    rpn_cls_score_reshape = reshape(rpn_cls_score, shp)
-    rpn_cls_prob = softmax(rpn_cls_score_reshape, axis=0)
+    # Ignore predictions for the 'ignore label', i.e. set target and prediction to 0 --> needs to be softmaxed before
+    ignore = user_function(IgnoreLabel(rpn_cls_prob, rpn_labels_rshp, ignore_label=-1))
+    rpn_cls_prob_ignore = ignore.outputs[0]
+    fg_targets = ignore.outputs[1]
+    bg_targets = 1 - fg_targets
+    rpn_labels_ignore = splice(bg_targets, fg_targets, axis=0)
+
+    # RPN losses
+    rpn_loss_cls = cross_entropy_with_softmax(rpn_cls_prob_ignore, rpn_labels_ignore, axis=0)
+    rpn_loss_bbox = user_function(SmoothL1Loss(rpn_bbox_pred, rpn_bbox_targets))
 
     # ROI proposal
     # - ProposalLayer:
@@ -151,7 +163,12 @@ def faster_rcnn_predictor(features, gt_boxes, n_classes):
     #    Assign object detection proposals to ground-truth targets. Produces proposal
     #    classification labels and bounding-box regression targets.
     #  + adds gt_boxes to candidates and samples fg and bg rois for training
-    rpn_rois = user_function(ProposalLayer(rpn_cls_prob, rpn_bbox_pred, im_info=im_info))
+
+    # reshape predictions per (H, W) position to (2,9) ( == (bg, fg) per anchor)
+    shp = (2,num_anchors,) + rpn_cls_score.shape[-2:]
+    rpn_cls_prob_reshape = reshape(rpn_cls_prob, shp)
+
+    rpn_rois = user_function(ProposalLayer(rpn_cls_prob_reshape, rpn_bbox_pred, im_info=im_info))
     ptl = user_function(ProposalTargetLayer(rpn_rois, gt_boxes))
     rois = ptl.outputs[0]
     labels = ptl.outputs[1]

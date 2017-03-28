@@ -16,6 +16,8 @@ from fast_rcnn.bbox_transform import bbox_transform
 from utils.cython_bbox import bbox_overlaps
 
 DEBUG = False
+debug_fwd = False
+debug_bkw = False
 
 #class ProposalTargetLayer(caffe.Layer):
 class ProposalTargetLayer(UserFunction):
@@ -62,6 +64,7 @@ class ProposalTargetLayer(UserFunction):
                 output_variable(bbox_targets_shape, self.inputs[0].dtype, self.inputs[0].dynamic_axes, needs_gradient=False)]
 
     def forward(self, arguments, outputs, device=None, outputs_to_retain=None):
+        if debug_fwd: print("--> Entering forward in {}".format(self.name))
         bottom = arguments
 
         # Proposal ROIs (0, x1, y1, x2, y2) coming from RPN
@@ -165,6 +168,7 @@ class ProposalTargetLayer(UserFunction):
         # pass
 
     def backward(self, state, root_gradients, variables):
+        if debug_bkw: print("<-- Entering backward in {}".format(self.name))
         """This layer does not propagate gradients."""
         pass
 
