@@ -59,7 +59,7 @@ class ProposalTargetLayer(UserFunction):
         # bbox_outside_weights
         ##top[4].reshape(1, self._num_classes * 4)
 
-        return [output_variable(rois_shape, self.inputs[0].dtype, self.inputs[0].dynamic_axes, needs_gradient=False),
+        return [output_variable(rois_shape, self.inputs[0].dtype, self.inputs[0].dynamic_axes, needs_gradient=False), # , name="rpn_target_rois"
                 output_variable(labels_shape, self.inputs[0].dtype, self.inputs[0].dynamic_axes, needs_gradient=False),
                 output_variable(bbox_targets_shape, self.inputs[0].dtype, self.inputs[0].dynamic_axes, needs_gradient=False)]
 

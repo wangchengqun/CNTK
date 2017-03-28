@@ -55,7 +55,7 @@ class ProposalLayer(UserFunction):
         #if len(top) > 1:
         #    top[1].reshape(1, 1, 1, 1)
 
-        return [output_variable(proposalShape, self.inputs[0].dtype, self.inputs[0].dynamic_axes, needs_gradient=False)]
+        return [output_variable(proposalShape, self.inputs[0].dtype, self.inputs[0].dynamic_axes, needs_gradient=False)] # , name="rpn_rois"
 
     def forward(self, arguments, device=None, outputs_to_retain=None):
         if debug_fwd: print("--> Entering forward in {}".format(self.name))
@@ -197,6 +197,10 @@ class ProposalLayer(UserFunction):
         if debug_bkw: print("<-- Entering backward in {}".format(self.name))
         """This layer does not propagate gradients."""
         pass
+
+    def clone(self, cloned_inputs):
+        #import pdb; pdb.set_trace()
+        return ProposalLayer(cloned_inputs[0], cloned_inputs[1], im_info=self._im_info, rois_per_image=self._rois_per_image)
 
 
 def _filter_boxes(boxes, min_size):
